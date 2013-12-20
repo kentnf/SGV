@@ -56,7 +56,7 @@ for my $tk (sort keys %blk) {#先根据query排序，然后提取所有需要filtered掉的query
 		$total_cov += ($ar->[1]-$ar->[0]+1); #一个query上所有非重叠block的长度之和
 	}
 	my $ratio=int($total_cov/$query_len{$tk}*10000+0.5)/100;
-	if($ratio>=$min_ratio){#所有符合条件的query,都需要存起来
+	if($ratio >= $min_ratio){#所有符合条件的query,都需要存起来
 		defined $query_filtered{$tk} or $query_filtered{$tk} = 1;
 	}
 	#向结果文件输出的各列

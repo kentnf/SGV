@@ -42,8 +42,7 @@ close(IN);
 open(OUT, ">$output");
 foreach my $chr (keys(%depth))
 {
-	#print OUT $chr."\t".$depth{$chr}[0]."\t".$depth{$chr}[1]."\n";#输出hit名称，平均深度和hit被覆盖的位置总数
-	print OUT $chr."\t".$depth{$chr}[0]."\n";#输出hit名称，平均深度
+	print OUT $chr."\t".$depth{$chr}[0]."\t".$depth{$chr}[1]."\n";#输出hit名称，平均深度和hit被覆盖的位置总数
 }
 close(OUT);
 

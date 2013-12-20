@@ -19,29 +19,65 @@ our $input2 = $ARGV[1]; #这个是blast table
 our $output = $ARGV[2]; #这是要得到的输出文件，包括了所有提取的序列
 
 open(IN1, "$input1");
-my %hit_index; 
-my %query_exists;#这部分数据都要处理
+my %hit_index; #保存在第一个文件中出现的hit，作为reference
+
 while (<IN1>) {
 	chomp; 
-	my @ta = split(/\t/, $_); 
-	defined $hit_index{$ta[0]} or $hit_index{$ta[0]} = 1; 
+	my @cols = split(/\t/, $_); 
+	defined $hit_index{$cols[0]} or $hit_index{$cols[0]} = 1; #把所有出现的hit用hash保存
 }
 close(IN1);
 
 open(IN2, "$input2");
 open(OUT, ">$output");
-while(<IN2>) {
-	chomp; 
-	my @ta = split(/\t/, $_); 
-	if(defined $hit_index{$ta[2]}) {#如果包括这个hit在输入文件1中存在
-		print OUT join("\t", @ta[0,1,2,3,6,8,9,10,11,12,13])."\n";#对应的contig记录就输出
-		defined $query_exists{$ta[0]} or $query_exists{$ta[0]} = 1;
-	}else{#否则看一下，每个contig只输出一次（去除重复记录）
-		if(not defined $query_exists{$ta[0]}){
-			print OUT join("\t", @ta[0,1,2,3,6,8,9,10,11,12,13])."\n";#就输出
-			$query_exists{$ta[0]} = 1;
+my $last_query="";
+my $current_query;
+
+my $high_evalue;#保存每个query最高的identity，其实就是第一次出现的(因为已排序）
+my $current_evalue;
+
+my $high_identity;#保存每个query最高的identity
+my $current_identity;
+
+my $high_record;#保存前一个query的最好hsp整行记录
+my $if_has_ref=0;#表示前一个query或当前query没有reference
+
+while (<IN2>) {
+	my @cols = split(/\t/, $_);
+	$current_query=$cols[0];
+	$current_identity=$cols[5];
+	$current_evalue=$cols[6];	
+	if($current_query ne $last_query){#每次出现一个新的query
+		if($if_has_ref==0 && $last_query ne ""){#先看前一个query的所有hsp有无ref，如果都没有ref
+			print OUT $high_record;#就把前一个query中所有hsp中最好hsp输出
 		}
-	}  
+		#处理完上个query，开始分析当前query的第一个hsp
+		$if_has_ref=0;   #表示当前query还没有找到ref
+		if (defined($hit_index{$cols[2]})){#如果第一个hsp就有ref
+			$high_identity=$cols[5];#这个就是最高的identity
+			$high_evalue=$cols[6];	#这个就是最高的evalue
+			print OUT $_;           #输出这条记录
+			$if_has_ref=1;	        #表示当前query找到了ref		
+		}else{
+			$high_record=$_; #如果第一个没有ref，保留为最高的，如果本次的所有hsp都没有ref，就在下次输出这个			
+		}
+	}else{#对于当前query后续的hsp
+		if($if_has_ref==1){#如果当前query已经找到了ref
+			if (defined($hit_index{$cols[2]}) && $current_evalue>=$high_evalue && $current_identity>=$high_identity)
+			{
+				print OUT $_;#只输出有ref同时和最好的hsp同样identity和evalue的结果(注意用>=,后面的有可能更高)			
+			}
+		}else{#如果当前query还没找到ref
+			if (defined($hit_index{$cols[2]})){#一旦找到ref
+				$high_identity=$cols[5];#这个就是最高的
+				$high_evalue=$cols[6];		
+				print OUT $_;
+				$if_has_ref=1;	#表示当前的query找到了ref
+			}
+		}
+	
+	}
+	$last_query=$cols[0];
 }
 close(IN2);
 close(OUT);

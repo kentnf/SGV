@@ -1,10 +1,8 @@
 #!/usr/bin/env perl
-
 use strict;
 use warnings;
 use Getopt::Long;
 use Cwd;
-use FindBin;
 my $usage = <<_EOUSAGE_;
 
 #########################################################################################
@@ -45,44 +43,41 @@ _EOUSAGE_
 	;
 
 #################
-# global vars	#	
+##   全局变量  ##
 #################
 our $file_list;
-our $suffix="fastq";		# input file must have fastq suffix
+our $suffix="fastq";;          #输入文件（fastq格式）的后缀名
 our $run_R;
 our $rRNA_removal;
 our $virus_removal;
 our $rRNA_reference="rRNA.fasta";
-our $virus_reference= "virus_genbank186.fasta";	#virus sequence
+our $virus_reference= "virus_genbank186.fasta";#包括全部参考序列的文件名称（FASTA格式）
 
-our $adapter;			# small RNA adapter sequence
-our $adapterLen=11;		# the leftmost length of adapter sequence
+our $adapter;         #adapter序列,所有的数据都是同一个adapter
+our $adapterLen=11;  #原始adapter序列的前adapter_offset个bp，否则就用adapter全长用来匹配
 our $n_Cutoff=1;
 our $read_Length=15; 
-our $read_PerYield=5e5;		#5Mreads*4*100=2G bt
+our $read_PerYield=5e5;#5Mreads*4*100=2G字节
  
-our $max_dist = 1;		#bwa max editable distance
-our $max_open = 1;		#bwa max allowed gap count
-our $max_extension = 1; 	#bwa max allowed gap length, -1 means not allowd long gap
-our $len_seed=15; 		#bwa 中的种子区长度,100bp测序用50，50bp测序用36
-our $dist_seed = 1; 		#bwa 种子区允许的最大编辑距离
-our $thread_num = 8; 		#bwa cpu number
+our $max_dist = 1;  #bwa允许的最大编辑距离 
+our $max_open = 1;  #bwa允许的最大gap数量
+our $max_extension = 1; #bwa允许的最大gap长度,-1表示不允许长gap
+our $len_seed=15; #bwa中的种子区长度,100bp测序用50，50bp测序用36
+our $dist_seed = 1; #bwa种子区允许的最大编辑距离
+our $thread_num = 8; #bwa程序调用的线程数量 
 
 ################################
-# set folder and path	       #
+##   设置所有目录和文件的路径 ##
 ################################
-our $WORKING_DIR=cwd();				# current folder
-our $DATABASE_DIR=$WORKING_DIR."/databases";	# database
-our $BIN_DIR=$WORKING_DIR."/bin";		# bin script
-our $Tools=$WORKING_DIR."/tools";		# tool script
-
-
-
+our $WORKING_DIR=cwd();#工作目录就是当前目录
+our $DATABASE_DIR=$WORKING_DIR."/databases";#所有数据库文件所在的目录
+our $BIN_DIR=$WORKING_DIR."/bin";#所有可执行文件所在的目录
+our $Tools=$WORKING_DIR."/tools";#所有作为工具的可执行文件所在的目录
 
 ##################
-# input parameter#
+## 程序参数处理 ##
 ##################
-&GetOptions( 'file_list=s' => \$file_list,
+&GetOptions( 'file_list=s' => \$file_list,#包括所有待处理的样本文件名称（无后缀）
 	'suffix=s' => \$suffix,
 	'adapter=s' => \$adapter,
 	'adapterLen=i' => \$adapterLen,
@@ -107,40 +102,29 @@ unless ($file_list) {
 }
 
 #################
-# main program  #
-#################
+##  主程序开始 ##
+################
 main: {
-
-	my $test = ${FindBin::RealBin};
-	print $test."\n";
-
+    #这部分是clipper过程，如果不需要可以注释掉
 	system("$Tools/fastq_clipper.pl --filelist $file_list --suffix $suffix --adapter $adapter --adapterLen $adapterLen --distance 1");
 	system("$Tools/fastq_clipper.pl --filelist $file_list --suffix unmatched1 --adapter $adapter --adapterLen $adapterLen --distance 2");
 	system("$BIN_DIR/files_combine1.pl --filelist $file_list --suffix trimmed --startNumber 1 --endNumber 2");
-	#system("rm *.trimmed1");
-	#system("rm *.trimmed2");
-	#system("rm *.null1");
-	#system("rm *.null2");
-	#system("rm *.unmatched1");
-	#system("rm *.unmatched2");
-
-	# remove reads with more than 1 "N"
-	# the remove reads short than 15 bp
+	system("rm *.trimmed1");
+	system("rm *.trimmed2");
+	system("rm *.null1");
+	system("rm *.null2");
+	system("rm *.unmatched1");
+	system("rm *.unmatched2");
+    #先去除含有1个"N"以上的reads，最后去除短reads（<15bp）
 	if($run_R){
-		my $R_cmd = "Rscript $BIN_DIR/run_sRNA_clean.R filelist=$file_list nCutoff=$n_Cutoff readLength=$read_Length RdPerYield=$read_PerYield";
-		system($R_cmd) && die "Error in command $R_cmd\n";
+		system("Rscript $BIN_DIR/run_sRNA_clean.R filelist=$file_list nCutoff=$n_Cutoff readLength=$read_Length RdPerYield=$read_PerYield");
+ 	}       
+	#如果需要，就去除rRNA污染
+	if($rRNA_removal){	
+		system("$BIN_DIR/bwa_remove.pl --file_list $file_list --reference $DATABASE_DIR/$rRNA_reference --max_dist $max_dist --max_open $max_open --max_extension $max_extension --len_seed $len_seed --dist_seed $dist_seed --thread_num $thread_num");
+		system("$BIN_DIR/files_name_change.pl --file_list $file_list --suffix1 unmapped --suffix2 clean");
 	}
-      
-	# remove rRNA reads
-	if($rRNA_removal){
-		my $BWA_remove_cmd = "$BIN_DIR/bwa_remove.pl --file_list $file_list --reference $DATABASE_DIR/$rRNA_reference --max_dist $max_dist --max_open $max_open --max_extension $max_extension --len_seed $len_seed --dist_seed $dist_seed --thread_num $thread_num";
-		system($BWA_remove_cmd) && die "Error in command: $BWA_remove_cmd\n";
-
-		my $file_change_cmd = "$BIN_DIR/files_name_change.pl --file_list $file_list --suffix1 unmapped --suffix2 clean";
-		system($file_change_cmd) && die "Error in command : $file_change_cmd\n";
-	}
-
-	# remove virus reads
+	#如果需要，就去除virus污染
 	if($virus_removal){	
 		system("$BIN_DIR/bwa_remove.pl --file_list $file_list --reference $DATABASE_DIR/$virus_reference --max_dist $max_dist --max_open $max_open --max_extension $max_extension --len_seed $len_seed --dist_seed $dist_seed --thread_num $thread_num");
 		system("$BIN_DIR/files_name_change.pl --file_list $file_list --suffix1 unmapped --suffix2 clean");

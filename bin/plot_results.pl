@@ -9,8 +9,8 @@ if (@ARGV < 4)
   exit(0);
 }
 
-our $input1 = $ARGV[0]; #这个是作为index的文件
-our $input2 = $ARGV[1]; #
+our $input1 = $ARGV[0]; #第一个循环处理这个文件，并选择几列输出到html文件(总的报告文件)，包括指向下面文件的链接
+our $input2 = $ARGV[1]; #这个文件用于生成每条参考序列自己的html文件（含可视化的图形）
 our $output = $ARGV[2]; # 相对于工作目录的输出目录
 our $type = $ARGV[3]; #
 our $WORKING_DIR=cwd();#工作目录就是当前目录
@@ -35,12 +35,14 @@ td,th
   <tr bgcolor=#e2e8ec>
     <th>Reference</th>
     <th>Length</th>
-    <th>Coverage</th>
+    <th>Coverage(%)</th>
+    <th>#contig</th>
     <th>Depth</th>
     <th>Genus</th>
     <th width="50%">Description</th>
   </tr>';
 
+#下面根据上面的格式，输出到html文件
 while (<IN1>) {
 	chomp;
 	$line_number++;	
@@ -48,16 +50,18 @@ while (<IN1>) {
 	$all_hits{$each_line[0]}=1; 
 	$index{$each_line[0]}=$line_number;
 	my $link="$type"."_references/".$each_line[0].".html";
-	my $coverage= sprintf("%.3f", $each_line[3]);
-	my $depth= sprintf("%.1f", $each_line[5]);
+	my $coverage= sprintf("%.3f", $each_line[3])*100;
+	my $contigs= $each_line[5];
+	my $depth= sprintf("%.1f", $each_line[6]);
 	$out_table .= qq' 
    <tr>
         <td><a href="$link">$each_line[0]</a></td>
         <td>$each_line[1]</td>
-        <td>$each_line[2] ($coverage)</td>
+        <td>$each_line[2]($coverage)</td>
+        <td>$contigs</td>	
         <td>$depth</td>
-        <td>$each_line[6]</td>	
-	<td width="50%">$each_line[7]</td>	
+        <td>$each_line[7]</td>	
+	<td width="50%">$each_line[8]</td>	
    </tr>';	
 }
 close(IN1);
@@ -132,6 +136,7 @@ sub draw_img
 			-glyph => 'generic',
 			-bgcolor => 'blue',
 			-label => 1,
+			-link => "http://www.ncbi.nlm.nih.gov/nuccore/$$hit_id"
 		);
 	#再建一个track，显示所有的其他feature（contigs）
 	my $track = $panel->add_track(

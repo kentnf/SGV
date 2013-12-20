@@ -1,10 +1,9 @@
 #!/usr/bin/perl
+#use strict;   #变量必须定义才可以使用
+#use warnings; #对未初始化变量是给出警告
+use Getopt::Long; #这个模块可以接受完整参数
 
-use strict;   
-use warnings; 
-use Getopt::Long; 
-use IO::File;
-
+#参数处理
 my $usage = <<_EOUSAGE_;
 
 #########################################################################################
@@ -23,30 +22,27 @@ our $suffix;        #
 our $startNumber = 1;  
 our $endNumber; 
 
-&GetOptions( 
-	'filelist=s'	=> \$filelist,
-	'suffix=s'	=> \$suffix,
-	'startNumber=i' => \$startNumber,
-	'endNumber=i'	=> \$endNumber
-);
+#从命令行参数向变量传值
+&GetOptions( 'filelist=s' => \$filelist,
+			'suffix=s' => \$suffix,
+			'startNumber=i' => \$startNumber,
+			'endNumber=i' => \$endNumber
+			 );
 
+#主程序开始
 open(IN1,$filelist) || die "Can't open the $filelist file\n";
 my $files1="";
-while(<IN1>)
-{
+while(<IN1>){
 	chomp;
-	my $file_base = $_;
-
 	my $files="";
 	
-	for( my $i=$startNumber; $i<=$endNumber; $i++)
-	{
-		$files.=" ".$file_base.".".$suffix.$i." ";
+	for(my $i = $startNumber; $i<= $endNumber; $i++){
+		$files=$files.$_.".$suffix$i ";#所有需要合并的文件名称连在一起
 	}
 	
-	my $finalFile = $_.".".$suffix;
+	my $finalFile=$_.".$suffix";
 	print "cat $files > $finalFile\n";
-	my $result = `cat $files > $finalFile`;
+	my $result = `cat $files> $finalFile`;		
 }
 close(IN1);
 

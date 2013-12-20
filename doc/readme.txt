@@ -33,7 +33,8 @@ to produce novel contigs:
 to produce combined contigs:		
 	files_combine2.pl	
 	removeRedundancy_batch.pl
-	
+
+virus_detect.pl	
 #################################################
 ## clean还是unmapped来correct组装好的contigs   ##
 #################################################
@@ -54,3 +55,12 @@ column2: The length of the identified virus
 column3: The total positions covered on the identified virus
 column4: The coverage of the identified virus(col3/col2) 
 column5: The average depth of the identified virus 
+
+##########################
+##   搜索报错的关键词   ##
+##########################
+Error
+Aborted
+cannot
+No
+core dumped

@@ -60,10 +60,10 @@ for my $tk (sort keys %blk) {#先根据hit排序
 		print join("\t", $tk, $hit_len{$tk}, $ar->[0], $ar->[1], $ar->[1]-$ar->[0]+1, join(",", @query_names))."\n"; #向标准输出输出各列
 		#hit名称，hit长度，hit一个block的起点，hit一个block的终点，hit一个block的长度
 		$total_cov += ($ar->[1]-$ar->[0]+1); #一个hit上所有非重叠block的长度之和
-		@aa{@query_names} = (1) x scalar(@query_names); 
+		@aa{@query_names} = (1) x scalar(@query_names); #将所有contigs的名称存入hash表
 	}
-	print OUT join("\t", $tk, $hit_len{$tk}, $total_cov, $total_cov/$hit_len{$tk}*1.0, join(",", sort keys %aa))."\n"; #向结果文件输出各列
-	#hit名称，hit长度，hit被覆盖的百分比
+	print OUT join("\t", $tk, $hit_len{$tk}, $total_cov, $total_cov/$hit_len{$tk}*1.0, join(",", sort keys %aa), scalar(keys %aa))."\n"; #向结果文件输出各列
+	#hit名称，hit长度，hit被覆盖bp数，hit被覆盖的百分比，所有contigs名称，contigs数量
 }
 close(OUT);
 

@@ -52,23 +52,25 @@ open(IN, "$input");
 while (<IN>) {
 	chomp; 
 	my @each_line = split(/\t/, $_);
-        my @contigs= split(/,/, $each_line[4]);#第5列是所有contig的名称	
-	push(@all_data, [scalar(@contigs), $each_line[3], $_]);#contig数量，covered比率和整行数据
+    my @contigs= split(/,/, $each_line[4]);#第5列是所有contig的名称
+    my $covered_bp=$each_line[7];
+    if ($each_line[7] eq ""){$covered_bp=0;}	
+	push(@all_data, [scalar(@contigs), $covered_bp, $_]);#contig数量，covered bp总数(alignment)和整行数据
 }
 close(IN);
 
 my @inset;  #用于存储非冗余序列，这样会再次存储@all_data中的序列，应该改进为只保存index
 my @restset = ''; #用于存储冗余序列，这些数据的保存仅为了校对用
-@all_data = sort { -1*($a->[0] <=> $b->[0]) || -1*($a->[1] <=> $b->[1])} @all_data; #@all_data中数据按照contig数量，然后hit长度降序排序
-=head;#输出看一下
+@all_data = sort { -1*($a->[0] <=> $b->[0]) || -1*($a->[1] <=> $b->[1])} @all_data; #@all_data中数据按照contig数量，然后covered bp总数降序排序
+=head;#调试时，输出看一下
 for my $tr (@all_data) {
  print $tr->[2]."\n";
 }
 =cut;
 my $contig_count=1; 
 for my $tr (@all_data) {
-	if (scalar(@inset)  == 0) {#第一次把最长的序列先放入inset集合
-		push(@inset, $tr->[2]); 
+	if (scalar(@inset)  == 0) {#第一次
+		push(@inset, $tr->[2]); #把contig数量最多的一条hit先放进来
 	}else{
 		my @aa = split(/\t/, $tr->[2]);
 		#print $tr->[2]."\n";
@@ -87,12 +89,13 @@ for my $tr (@inset) {
 }
 close(OUT1);
 
+=head;#没用，就不输出了
 open(OUT2, ">restset");#将所有冗余序列输出
 for my $tr (@restset) {
 	print OUT2 $tr."\n";
 }
 close(OUT2);
-
+=cut;
 #######################
 ##     子程序开始    ##
 #######################
@@ -125,7 +128,7 @@ sub process_cmd {
 	print "CMD: $cmd\n";
 	my $ret = system($cmd);	
 	if ($ret) {
-		die "Error, cmd: $cmd died with ret $ret";
+		print "Error, cmd: $cmd died with ret $ret";
 	}
 	return($ret);
 }

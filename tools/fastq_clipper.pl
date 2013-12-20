@@ -24,9 +24,7 @@ _EOUSAGE_
 our $filelist;        #包括需要处理的所有fastq文件名称列表
 our $suffix="fastq";          #输入文件（fastq格式）的后缀名
 our $adapter;         #adapter序列,所有的数据都是同一个adapter
-our $adapter_offset;  
-#原始adapter序
-#列的前adapter_offset个bp，否则就用adapter全长用来匹配
+our $adapter_offset;  #原始adapter序列的前adapter_offset个bp，否则就用adapter全长用来匹配
 our $distance;        #adapter与read匹配时可允许的最大编辑距离，目前最多是1
 our $levenshtein=0;#如果设定，此值自动转为1，表示使用levenshtein算法求编辑距离
 
@@ -40,7 +38,6 @@ our $levenshtein=0;#如果设定，此值自动转为1，表示使用levenshtein算法求编辑距离
 	         'levenshtein!' => \$levenshtein
 			 );
 unless ($filelist&&$adapter) {
-	print $distance."\n";
 	die $usage;
 }
 print "distance is $distance\n";

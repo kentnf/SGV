@@ -110,11 +110,8 @@ for my $tr (@all_data) {
 			$inset{$tr->[0]} = $tr->[2]; 
 		}
 		else{#如果query是部分冗余，合并后替换
-			my @names = split(/\:/, $return_col[0]);#第一列是hit name : query name		
-			delete($inset{$names[0]}); #原来hit name对应的记录删除
-			my $new_name =  $return_col[0];
-			$new_name =~ s/\:/\+/;	
-			$inset{$new_name} = $return_col[1];#并且新增加一条记录
+			my @names = split(/\:/, $return_col[0]);#第一列是(hit_name:query_name)		
+			$inset{$names[0]} = $return_col[1];; #原来hit_name对应的记录被新序列覆盖
 			$restset .= $query;
 		}
 	}
@@ -218,10 +215,9 @@ sub findRedundancy
 					my $hit_to_start = $hit_length - $hit_start;
 
 					$identity =~ s/%//;
-					if($hsp_length <= 40) {$min_identity = 96;}
-					elsif($hsp_length > 40 && $hsp_length <= 50) {$min_identity = 97;}
-					elsif($hsp_length > 50 && $hsp_length <= 100) {$min_identity = 98;}
-					else{$min_identity = 99;}
+					if($hsp_length <= 50) {$min_identity = 95;}
+					elsif($hsp_length > 50 && $hsp_length <= 100) {$min_identity = 96;}
+					else{$min_identity = 97;}
                     
 					#下面判断的顺序非常重要
 					if ($identity < $min_identity)#hsp的identity不够，不能合并，不能判定为非冗余，需要看下一个
@@ -230,7 +226,8 @@ sub findRedundancy
 					}
 					if ($query_start -1 <= $max_end_clip  && $query_to_end <= $max_end_clip)#query被subject包括，判定冗余
 					{
-
+					    #my $hit_seq = $inset->{$hit_name}; 
+					    #print "type1\t".$hit_name."\t".$query_name."\t".$hit_seq."\n";#输出合并信息供人工校对，调试用
 						return $hit_name."\tr";
 					}
 					if($hsp_length >= $min_overlap)#第三种情况(有overlap)需要合并
@@ -242,10 +239,10 @@ sub findRedundancy
 						my $hit_seq = $inset->{$hit_name}; 
 						if ($strand==1)
 						{
-						        #下列是query在前的情况
+						    #下列是query在前的情况
 							if($query_start -1 > $max_end_clip  && $query_to_end <= $max_end_clip && $hit_start <= $max_end_clip)
 							{ 
-						           my $query_string = substr($query_seq, 0, $query_start); 							   
+						       my $query_string = substr($query_seq, 0, $query_start); 							   
 							   my $hit_string = substr($hit_seq, $hit_start, $hit_to_start);
 							   #print "type2\t".$hit_name."\t".$query_name."\t".$query_string."\t".$hit_string."\n";#输出合并信息供人工校对，调试用
 							   $combined_seq = $hit_name.":".$query_name."\t".$query_string.$hit_string;
@@ -266,7 +263,7 @@ sub findRedundancy
 							#下列是query在前的情况
 							if($query_start -1 > $max_end_clip  && $query_to_end <= $max_end_clip && $hit_to_end <= $max_end_clip)
 							{ 
-							   my $query_string = substr($query_seq, 0, $query_start+1); 							   
+							   my $query_string = substr($query_seq, 0, $query_start); 							   
 							   my $hit_string = substr($hit_seq, 0, $hit_end-1);
 							   rcSeq(\$hit_string, 'rc'); #求序列的反向互补
 							   #print "type4\t".$hit_name."\t".$query_name."\t".$query_string."\t".$hit_string."\n";#输出合并信息供人工校对，调试用
@@ -409,7 +406,7 @@ sub process_cmd {
 	print "CMD: $cmd\n";
 	my $ret = system($cmd);	
 	if ($ret) {
-		die "Error, cmd: $cmd died with ret $ret";
+		print "Error, cmd: $cmd died with ret $ret";
 	}
 	return($ret);
 }
