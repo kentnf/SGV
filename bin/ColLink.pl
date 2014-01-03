@@ -4,11 +4,16 @@
 #文件inputfile1中id与inputfile2中id一样的，对应的信息保留
 #每个文件内部的各列不是必须选择的，而且顺序可以变换
 use strict;
+use warnings;
 use Getopt::Long;
+use IO::File;
+
 my %opts;
 GetOptions(\%opts,
-	"keyC1:s","keyC2:s",
-	"col1:s","col2:s",
+	"keyC1:s",
+	"keyC2:s",
+	"col1:s",
+	"col2:s",
 	"f1:s",
 	"out:s",
 	"add!",
@@ -103,6 +108,4 @@ while (<>) {
 	print STDOUT "$line\t$add\n";
 }
 #close OUT;
-
-
 
