@@ -90,14 +90,17 @@ main: {
 			$current_folder = $sample."_".$i."_".$coverage_start;
 			$statfile = $current_folder."/contigs.fa";
 			my $aa = contigStats($statfile);        # return hash reference
-			$objective = $aa->{$objective_type};
-			print OUT1 $i."\t".$coverage_start."\t".$objective."\t".$aa->{avgLen}."\t".$aa->{numSeqs}."\n";
-			# output hash length, coverage, 优化目标值, avgLength, contigs num
-			if ( $objective > $max_objective ) {
-				print OUT1 "yes"."\n"; #print yes if the optimization value improved(higher than before)
-				$max_objective = $objective;
-				$opt_hash_length = $i;
-				$opt_avgLen=$aa->{avgLen};
+			if ( defined $aa->{$objective_type} ) {
+				$objective = $aa->{$objective_type};
+				print OUT1 $i."\t".$coverage_start."\t".$objective."\t".$aa->{avgLen}."\t".$aa->{numSeqs}."\n";
+			
+				# output best hash length, coverage, objective, avgLength, contigs num
+				if ( $objective > $max_objective ) {
+					print OUT1 "yes"."\n"; #print yes if the optimization value improved(higher than before)
+					$max_objective = $objective;
+					$opt_hash_length = $i;
+					$opt_avgLen=$aa->{avgLen};
+				}
 			}
 			process_cmd("rm $current_folder -r");		
 		} 
@@ -107,15 +110,17 @@ main: {
 			$current_folder=$sample."_".$opt_hash_length."_".$j;
 			$statfile=$current_folder. "/contigs.fa";
 			my $aa=contigStats($statfile);
-			$objective=$aa->{$objective_type};
-			print OUT1 $opt_hash_length."\t".$j."\t".$objective."\t".$aa->{avgLen}."\t".$aa->{numSeqs}."\n";
-			# output the best hast length, coverage, objective, avglength, contigs num
-			
-			if($objective>$max_objective){
-				print OUT1 "yes"."\n";# print yes of the optimization value improved
-				$max_objective=$objective;
-				$opt_coverage=$j;
-				$opt_avgLen=$aa->{avgLen};
+			if ( defined $aa->{$objective_type} ) {
+				$objective=$aa->{$objective_type};
+				print OUT1 $opt_hash_length."\t".$j."\t".$objective."\t".$aa->{avgLen}."\t".$aa->{numSeqs}."\n";
+
+				# output the best hast length, coverage, objective, avglength, contigs num
+				if($objective>$max_objective){
+					print OUT1 "yes"."\n";# print yes of the optimization value improved
+					$max_objective=$objective;
+					$opt_coverage=$j;
+					$opt_avgLen=$aa->{avgLen};
+				}
 			}
 			process_cmd("rm $current_folder -r");
 		}       
@@ -195,7 +200,8 @@ sub contigStats {
 	}
 	
 	my %out;
-	if($numseq > 0){
+	if($numseq > 0)
+	{
 		$out{numSeqs} = $numseq;
 		$out{numBases} = $avglen;
 		$out{numOK} = ($avglen - $nn);
@@ -207,7 +213,8 @@ sub contigStats {
 		#$out{minsize} = $minsize;
 		$out{numTooSmall} = $toosmall;
 	}
-	else {
+	else 
+	{
 		$out{$numseq} = 0;
 	}
 	

@@ -35,8 +35,9 @@ our $output_suffix; 	# 输出文件的后缀名称
 ################################
 # set folder and file path     #
 ################################
-our $WORKING_DIR=cwd();		# current folder
-$velvet_dir=${FindBin::RealBin};# velvet path 
+my $WORKING_DIR = cwd();			# current folder
+$velvet_dir = ${FindBin::RealBin};		# velvet path 
+my $tf = $WORKING_DIR."/temp";			# temp folder
 
 ##################
 # get input para #

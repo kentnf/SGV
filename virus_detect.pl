@@ -50,6 +50,12 @@ my $usage = <<_EOUSAGE_;
 #  --gap_cost_b      Cost to open a gap [2] 
 #  --gap_extension_b Cost to extend a gap [1]
 #
+# Result filter options(4):
+#  --hsp_cover		The coverage of hsp should be more than this cutoff for query or hit [0.75]
+#  --diff_ratio 	The hits with distance less than 0.25 will be combined into one  [0.25]
+#  --diff_contig_cover	The coverage for different contigs [0.5]
+#  --diff_contig_length	The length of different contigs [100] 
+#
 ###########################################################################################
 
 _EOUSAGE_
@@ -58,55 +64,57 @@ _EOUSAGE_
 ################################
 ##  set file folder path      ##
 ################################
-our $WORKING_DIR  = cwd();				# set current folder as working folder
-our $DATABASE_DIR = ${FindBin::RealBin}."/databases";	# set database folder
-our $BIN_DIR	  = ${FindBin::RealBin}."/bin";		# set programs folder 
-our $TEMP_DIR	  = $WORKING_DIR."/temp";		# set temp folder
+my $WORKING_DIR   = cwd();				# set current folder as working folder
+my $DATABASE_DIR  = ${FindBin::RealBin}."/databases";	# set database folder
+my $BIN_DIR	  = ${FindBin::RealBin}."/bin";		# set script folder 
+my $TEMP_DIR	  = $WORKING_DIR."/temp";		# set temp folder
 
 ###############################
 ##   global vars	     ##
 ###############################
-our $file_type= "fastq";			#输入文件的类型，当前只支持fastq和fasta格式
-our $reference= "vrl_genbank.fasta";		#包括全部参考序列的文件名称（FASTA格式）
-our $coverage=0.3;  				#每条参考序列如果被reads覆盖的部分占全长比例的阈值
-our $host_removal;         			#是否需要remove host
-our $host_reference;       			#如果要remove host，必须提供一个文件包括host的全部参考序列
-our $objective_type='maxLen';			#优化目标值的类型，只有n50、maxLen和avgLen三种
+my $file_type= "fastq";				# input file type, fasta or fastq
+my $reference= "vrl_genbank.fasta";		# virus sequence
+my $coverage=0.3;  				# 每条参考序列如果被reads覆盖的部分占全长比例的阈值
+my $host_removal;         			# switch for host removing
+my $host_reference;       			# host reference
+my $objective_type='maxLen';			# objective type for Velvet assembler: n50、maxLen, avgLen
 
 # paras for BWA
-
-our $max_dist = 1;  				#bwa允许的最大编辑距离 
-our $max_open = 1;  				#bwa允许的最大gap数量
-our $max_extension = 1; 			#bwa允许的最大gap长度,-1表示不允许长gap
-our $len_seed = 15; 				#bwa中的种子区长度
-our $dist_seed = 1; 				#bwa种子区允许的最大编辑距离
-our $thread_num = 8; 				#bwa程序调用的线程数量 
+my $max_dist = 1;  				# max edit distance 
+my $max_open = 1;  				# max gap opening
+my $max_extension = 1; 				# max gap extension (gap length)
+my $len_seed = 15; 				# bwa seed length
+my $dist_seed = 1; 				# bwa seed max edit distance
+my $thread_num = 8; 				# bwa thread number
 
 # paras for megablast detection (remove redundancy )
-
-our $strand_specific;  				#专门用于strand specific转录组
-our $min_overlap = 30; 				#hsp合并时，最短的overlap
-our $max_end_clip = 6; 				#hsp合并时，两端允许的最小clip
-our $cpu_num = 8;          			#megablast使用的cpu数目
-our $mis_penalty = -1;     			#megablast中，对错配的罚分，必须是负整数
-our $gap_cost = 2;         			#megablast中，对gap open的罚分，必须是正整数
-our $gap_extension = 1;    			#megablast中，对gap open的罚分，必须是正整数
+my $strand_specific;  				# switch for strand specific transcriptome data? 
+my $min_overlap = 30; 				# minimum overlap for hsp combine
+my $max_end_clip = 6; 				# max end clip for hsp combine
+my $cpu_num = 8;          			# thread number
+my $mis_penalty = -1;     			# megablast mismatch penlty, minus integer
+my $gap_cost = 2;         			# megablast gap open cost, plus integer
+my $gap_extension = 1;    			# megablast gap extension cost, plus integer 
 
 # paras for blast && identification 
+my $word_size = 11;
+my $exp_value = 1e-5;				#
+my $identity_percen = 25;			# tblastx 以蛋白质序列来比对时hsp的最小同一性
+my $mis_penalty_b = -1;				# megablast mismatch penlty, minus integer
+my $gap_cost_b = 2;				# megablast gap open cost, plus integer
+my $gap_extension_b = 1;			# megablast gap extension cost, plus integer
 
-our $diff_ratio= 0.25;
-our $word_size = 11;
-our $exp_value = 1e-5;				#
-our $identity_percen = 25;			# tblastx以蛋白质序列来比对时hsp的最小同一性
-our $mis_penalty_b = -1;			# megablast中，对错配的罚分，必须是负整数
-our $gap_cost_b = 2;				# megablast中，对gap open的罚分，必须是正整数
-our $gap_extension_b = 1;			# megablast中，对gap open的罚分，必须是正整数
+my $filter_query = "F";				# megablast switch for remove simple sequence
+my $hits_return = 500;				# megablast number of hit returns
 
-our $filter_query = "F";			# 默认不需要去除简单序列，这个不需要用户设定
-our $hits_return = 500;				# megablast返回的hit数目，这个不需要用户设定
+# paras for result filter
+my $hsp_cover = 0.75;
+my $diff_ratio= 0.25;
+my $diff_contig_cover = 0.5;
+my $diff_contig_length= 100; 
 
 # disabled parameters
-our $input_suffix='clean'; 			# 数据文件后缀（clean或unmapped）
+my $input_suffix='clean'; 			# input_suffix, disabled
 
 # get input paras #
 GetOptions(
@@ -131,15 +139,18 @@ GetOptions(
 	'mis_penalty=i' => 	\$mis_penalty,
 	'gap_cost=i' => 	\$gap_cost,
 	'gap_extension=i' => 	\$gap_extension,
-
-
-	'diff_ratio=s' => 	\$diff_ratio,
+	
 	'word_size=i' =>  	\$word_size,
 	'exp_value-s' =>  	\$exp_value,
 	'identity_percen=s' => 	\$identity_percen,	# tblastx以蛋白质序列来比对时hsp的最小同一性
 	'mis_penalty_b=i' => 	\$mis_penalty_b,
 	'gap_cost_b=i' => 	\$gap_cost_b,
-	'gap_extension_b=i' => 	\$gap_extension_b
+	'gap_extension_b=i' => 	\$gap_extension_b,
+
+	'hsp_cover=s' =>	\$hsp_cover,
+	'diff_ratio=s' => 	\$diff_ratio,
+	'diff_contig_cover=s' =>\$diff_contig_cover,
+	'diff_contig_length=s'=>\$diff_contig_length
 );
 
 # put input file parameters to filelist array
@@ -229,8 +240,9 @@ main: {
 	# identify the virus
 	my $cmd_identify = "$BIN_DIR/virus_identify.pl ";
        	$cmd_identify .= "--file_list $file_list --file_type $file_type --reference $reference --contig_type combined ";
-	$cmd_identify .= "--diff_ratio $diff_ratio --word_size $word_size --exp_value $exp_value --identity_percen $identity_percen ";
+	$cmd_identify .= "--word_size $word_size --exp_value $exp_value --identity_percen $identity_percen ";
 	$cmd_identify .= "--cpu_num $cpu_num --mis_penalty $mis_penalty_b --gap_cost $gap_cost_b --gap_extension $gap_extension_b ";
+	$cmd_identify .= "--hsp_cover $hsp_cover --diff_ratio $diff_ratio --diff_contig_cover $diff_contig_cover --diff_contig_length $diff_contig_length ";
 	Util::process_cmd($cmd_identify);
 
 	# delete temp files and log files 

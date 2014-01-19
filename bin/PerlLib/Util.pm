@@ -8,7 +8,7 @@ sub process_cmd {
 	print "CMD: $cmd\n";
 	my $ret = system($cmd);	
 	if ($ret) {
-		print "Error, cmd: $cmd died with ret $ret";
+		die "Error, cmd: $cmd died with ret $ret";
 	}
 	return($ret);
 }

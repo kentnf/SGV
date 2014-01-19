@@ -22,7 +22,7 @@ my $usage = <<_EOUSAGE_;
 # Options(3):
 #  --file_type The format of files containing reads are fasta or fastq  [fastq]
 #  --reference The name of a fasta file containing all of the virus reference sequences  [vrl_genbank.fasta] 
-#  --diff_ratio The hits with distance less than 0.2 will be combined into one  [0.2] 
+#  --diff_ratio The hits with distance less than 0.25 will be combined into one  [0.25] 
 # 
 # blast-related options(7):
 #  --word_size [11] 
@@ -31,62 +31,73 @@ my $usage = <<_EOUSAGE_;
 #  --cpu_num         Number of processors to use [8] 
 #  --mis_penalty     Penalty for a nucleotide mismatch [-1]
 #  --gap_cost        Cost to open a gap [2] 
-#  --gap_extension   Cost to extend a gap [1] 
+#  --gap_extension   Cost to extend a gap [1]
+#
+# New options(3):
+#  --hsp_cover		The coverage of hsp should be more than this cutoff for query or hit [0.75]
+#  --diff_contig_cover	The coverage for different contigs [0.5]
+#  --diff_contig_length	The length of different contigs [100]
 #
 ###########################################################################################
 
 _EOUSAGE_
 
-	;
+;
 
 ################################
 ## set folder and file path   ##
 ################################
-our $WORKING_DIR = cwd();				# current folder : working folder
-our $BIN_DIR = ${FindBin::RealBin};			# bin folder
-our $result_dir = $WORKING_DIR."/result";		# result folder
-my  $tf = $WORKING_DIR."/temp";				# temp folder
+my $WORKING_DIR = cwd();				# current folder : working folder
+my $BIN_DIR = ${FindBin::RealBin};			# bin folder
+my $result_dir = $WORKING_DIR."/result";		# result folder
+my $tf = $WORKING_DIR."/temp";				# temp folder
 
-our $DATABASE_DIR= $WORKING_DIR."/databases";		# database folder
-our $seq_info = $DATABASE_DIR."/vrl_genbank.info";	# virus sequence info
+my $DATABASE_DIR = ${FindBin::RealBin}."/../databases";	# database folder
+my $seq_info = $DATABASE_DIR."/vrl_genbank.info";	# virus sequence info
 ###############################
 ##  global vars		     ##
 ###############################
-our $file_list;			# temp list of input file
-our $file_type= "fastq";
-our $contig_type;		# aligned assembled conbined
-our $reference= "";		# virus reference, fasta format
+my $file_list;			# temp list of input file
+my $file_type= "fastq";
+my $contig_type;		# aligned assembled conbined
+my $reference= "";		# virus reference, fasta format
 
-our $diff_ratio= 0.25;
-our $word_size = 11;
-our $cpu_num = 8;		# megablast: thread number
-our $mis_penalty = -1;		# megablast: penalty for mismatch
-our $gap_cost = 2;		# megablast: penalty for gap open
-our $gap_extension = 1;		# megablast: penalty for gap extension
-our $exp_value = 1e-5;		#
-our $identity_percen = 25;	# tblastx以蛋白质序列来比对时hsp的最小同一性
+my $hsp_cover = 0.75;		# for blast filter
+my $diff_ratio= 0.25;		# ratio for number of diff contig
+my $diff_contig_cover = 0.5;	# for hit filter
+my $diff_contig_length = 100;	# for hit filter
+my $word_size = 11;
+my $cpu_num = 8;		# megablast: thread number
+my $mis_penalty = -1;		# megablast: penalty for mismatch
+my $gap_cost = 2;		# megablast: penalty for gap open
+my $gap_extension = 1;		# megablast: penalty for gap extension
+my $exp_value = 1e-5;		#
+my $identity_percen = 25;	# tblastx以蛋白质序列来比对时hsp的最小同一性
 
-our $filter_query = "F";	# megablast: F - disable remove simple sequence
-our $hits_return = 500;		# megablast: hit number
-our $input_suffix='';
+my $filter_query = "F";		# megablast: F - disable remove simple sequence
+my $hits_return = 500;		# megablast: hit number
+my $input_suffix='';
 
 ########################
 # get input parameters #
 ########################
 GetOptions( 
-	'file_list=s'	=> \$file_list,
-	'contig_type=s' => \$contig_type,
-	'file_type=s' 	=> \$file_type,
-	'reference=s' 	=> \$reference,
-	'diff_ratio=f' 	=> \$diff_ratio,		
-	'word_size=i' 	=> \$word_size,
-	'exp_value=f' 	=> \$exp_value,
-	'identity_percen=f' => \$identity_percen,
-	'cpu_num=i' 	=> \$cpu_num,
-	'mis_penalty=i' => \$mis_penalty,
-	'gap_cost=i' 	=> \$gap_cost,
-	'gap_extension=i' => \$gap_extension
-	 );
+	'file_list=s'		=> \$file_list,
+	'contig_type=s' 	=> \$contig_type,
+	'file_type=s' 		=> \$file_type,
+	'reference=s' 		=> \$reference,
+	'diff_ratio=f' 		=> \$diff_ratio,
+	'hsp_cover=f'		=> \$hsp_cover,
+	'diff_contig_cover=f'	=> \$diff_contig_cover,
+	'diff_contig_length=i'	=> \$diff_contig_length,
+	'word_size=i' 		=> \$word_size,
+	'exp_value=f' 		=> \$exp_value,
+	'identity_percen=f' 	=> \$identity_percen,
+	'cpu_num=i' 		=> \$cpu_num,
+	'mis_penalty=i' 	=> \$mis_penalty,
+	'gap_cost=i' 		=> \$gap_cost,
+	'gap_extension=i' 	=> \$gap_extension
+);
 
 die $usage unless $file_list;	# required parameter
 
@@ -133,11 +144,7 @@ while(<$in>)
 	# 一个query对应的hits中 只保留比最低evalue那个hsp的identity少于drop_off(5%)以内的
 	#process_cmd("$BIN_DIR/blast_filter3.pl $sample.blastn.table1 $sample.blastn.table 0.75 5");
 	# *** do not understand why using the last parameter:1 for this function	
-	blast_filter("$sample.blastn.table1", "$sample.blastn.table", 0.75, 5, 1);
-
-	# remove temp file
-	#system("rm $sample.blastn.paired");
-	#system("rm $sample.blastn.table1");
+	blast_filter("$sample.blastn.table1", "$sample.blastn.table", $hsp_cover, 5, 1);
 	
 	# separate known and novel contig
 	# 1. get the all the hsps with > 60 identity for one query
@@ -159,7 +166,7 @@ while(<$in>)
 	process_cmd("$BIN_DIR/uniqComb.pl $sample.blastn.table -index $sample.known.contigs -col 0 -newCol 0 -exist > $sample.known.table");
 
 	# get coverage for each hit  
-	# process_cmd("$BIN_DIR/hit_cov1.pl $sample.known.table $sample.known.cov 60 0.5 > $sample.known.block");
+	#process_cmd("$BIN_DIR/hit_cov1.pl $sample.known.table $sample.known.cov 60 0.5 > $sample.known.block");
 	hit_cov("$sample.known.table", "$sample.known.cov", "$sample.known.block", 60, 0.5, 1);
 
 	# get hit virus sequence ID
@@ -189,7 +196,7 @@ while(<$in>)
 	process_cmd("$BIN_DIR/ColLink.pl $tf/1.tem -keyC1 0 -Col1 2,3 -keyC2 0 -add -f1 $seq_info > $sample.known.identified1");	
 
 	# combine hit accoridng to contig ? how it works
-	process_cmd("$BIN_DIR/hit_filter2.pl --input $sample.known.identified1 --diff_ratio $diff_ratio --output $sample.known.identified");
+	process_cmd("$BIN_DIR/hit_filter2.pl --input1 $sample.known.identified1 --input2 $sample.known.table --diff_ratio $diff_ratio --diff_contig_cover $diff_contig_cover --diff_contig_length $diff_contig_length --output $sample.known.identified");
 
 	##把contig对应的hit过滤，或者对应到known.identified的hit上，或者对应到e value最高的hit上面	
 	process_cmd("$BIN_DIR/query_filter2.pl $sample.known.identified $sample.known.table $sample.contigs.table");	
@@ -215,11 +222,11 @@ while(<$in>)
 	#产生对应hit的sam文件
 	process_cmd("$BIN_DIR/blastTable2sam.pl $sample.known.table1 > $sample_dir/$sample_base.known.sam");
 
-	#产生一个子目录，用于放最后的html文件	
+	# generate folder for contig alignment with html format	
 	system("mkdir $sample_dir/known_references");
 
 	#重新生成$sample.known.cov
-	# process_cmd("$BIN_DIR/hit_cov1.pl $sample.known.table1 $sample.known.cov 60 0.5 > $sample.known.block");
+	#process_cmd("$BIN_DIR/hit_cov1.pl $sample.known.table1 $sample.known.cov 60 0.5 > $sample.known.block");
 	hit_cov("$sample.known.table1", "$sample.known.cov", "$sample.known.block", 60, 0.5, 1);
 
 	#重新生成$sample.known.identified1
@@ -283,7 +290,7 @@ while(<$in>)
 		
 		#这里注意对hsp的要求都要低
 		# process_cmd("$BIN_DIR/hit_cov1.pl $sample.novel.table $sample.novel.cov $identity_percen 0 > $sample.novel.block");
-		hit_cov1("$sample.novel.table", "$sample.novel.cov", "$sample.novel.block", $identity_percen, 0, 1);
+		hit_cov("$sample.novel.table", "$sample.novel.cov", "$sample.novel.block", $identity_percen, 0, 1);
 		
 		process_cmd("cut -f1 $sample.novel.cov > $tf/hit_virus.list");
 		process_cmd("$BIN_DIR/extractFromFasta.pl -i $DATABASE_DIR/$reference --type list --query $tf/hit_virus.list --output1 $tf/hit_virus.fa --output2 $tf/remainding.fa");
@@ -305,7 +312,7 @@ while(<$in>)
 		#从$seq_info提取第3、4列加到文件1.tem的后面
 		process_cmd("$BIN_DIR/ColLink.pl $tf/1.tem -keyC1 0 -Col1 2,3 -keyC2 0 -add -f1 $seq_info > $sample.novel.identified1");			
 		#这是得到的最终文件
-		process_cmd("$BIN_DIR/hit_filter2.pl --input $sample.novel.identified1 --diff_ratio $diff_ratio --output $sample.novel.identified");
+		process_cmd("$BIN_DIR/hit_filter2.pl --input1 $sample.novel.identified1 --input2 $sample.novel.table --diff_ratio $diff_ratio --diff_contig_cover $diff_contig_cover --diff_contig_length $diff_contig_length --output $sample.novel.identified");
 
 		#把第一文件中存在的hit对应的contig保留下来
 		process_cmd("$BIN_DIR/query_filter2.pl $sample.novel.identified $sample.novel.table $sample.contigs.table");
@@ -322,7 +329,7 @@ while(<$in>)
 		process_cmd("$BIN_DIR/ColLink.pl $sample.contigs.info -keyC1 0 -Col1 1 -keyC2 0 -add -f1 $sample.novel.contigs1 > $sample.contigs.table1");		
 		# re-generate table 
 		#process_cmd("$BIN_DIR/arrange_col1.pl $sample.contigs.table1 > $sample_dir/$sample.novel.xls");
-		arrange_col1("$sample.contigs.table1", "$sample_dir/$sample.novel.xls");	
+		arrange_col1("$sample.contigs.table1", "$sample_dir/$sample_base.novel.xls");	
 
 		# get hit name (3rd col) for generate sam file	
 		process_cmd("cut -f1 $sample.novel.identified > $tf/novel.references.list");
@@ -393,7 +400,7 @@ sub process_cmd
 	print "CMD: $cmd\n";
 	my $ret = system($cmd);	
 	if ($ret) {
-		print "Error, cmd: $cmd died with ret $ret";
+		die "Error, cmd: $cmd died with ret $ret";
 	}
 	return($ret);
 }
@@ -428,9 +435,9 @@ sub blast_filter
 			$current_hit=$cols[2];	
 			$current_identity=$cols[5];
 
-			if($current_query ne $last_query){#如果遇到一个新的query
-				$high_identity=$cols[5];#记录最高的identity
-				print $out $_;#query的第一个hit肯定要，因为是evalue最低的
+			if($current_query ne $last_query){	#如果遇到一个新的query
+				$high_identity=$cols[5];	#记录最高的identity
+				print $out $_;			#query的第一个hit肯定要，因为是evalue最低的
 			}else{
 				if ($current_hit ne $last_hit && ($current_identity >= $high_identity-$identity_dropoff))#相同的<query,hit>中，只保留evalue最低的(即第一个)
 				{
@@ -491,14 +498,13 @@ sub hit_cov
 		my ($query_name, $query_length,	$hit_name, $hit_length,	$hsp_length, $identity,	$evalue,
 		$score, $strand, $query_start, $query_end, $hit_start, $hit_end) = (@ta[0..12]);
 
-		# covered = param * hsp length / query length
+		# query covered = param * hsp length / query length
 		my $query_covered= $param * $hsp_length / $query_length; 
 		if ( $identity >= $cutoff_identity && $query_covered >= $query_cov)
 		{
 			#建立hit和(hit_start,hit_end)之间的映射
 			push(@{$blk{$hit_name}}, [$hit_start, $hit_end]); 
 			$blk{$ta[2]}[-1][2]{$ta[0]}=1; 
-
 			defined $hit_len{$hit_name} or $hit_len{$hit_name} = $hit_length; 
 		}
 	}
@@ -509,14 +515,28 @@ sub hit_cov
 
 	foreach my $tk (sort keys %blk) # sort by hit name 
 	{
+		# structure of array '@o'
+		# [array] 		, [array]		  ... [array]
+		# [start, end, %contigs], [start, end, %contigs], ... [start, end, %contigs]
+
 		my @o; #存储没有overlap的hit上的block
 
-				# sort by hit start, hit end, and query name
+		# sort by hit start, hit end, and query name
 		foreach my $ar (sort {$a->[0]<=>$b->[0] || $a->[1]<=>$b->[1] || $a->[2] cmp $b->[2];} @{$blk{$tk}}) 
 		{
+			#if ($tk eq 'D10663')
+			#{
+			#	print "$$ar[0]\t$$ar[1]\n";
+			#	my %sss = %{$$ar[2]};
+			#	foreach my $k (sort keys %sss) {
+			#		print $k."\n";
+			#	}
+			#	die;
+			#}
+
 			if (scalar(@o) == 0) {
 				push(@o, [@$ar]); 
-			}elsif ($o[-1][1] >= $ar->[0]-1) {#把一个hit上重叠的区域合并
+			}elsif ($o[-1][1] >= $ar->[0]-1) {	#把一个hit上重叠的区域合并
 				for my $qname (keys %{$ar->[2]}) {
 					$o[-1][2]{$qname}=1; 
 				}
@@ -531,15 +551,18 @@ sub hit_cov
 		for my $ar (@o) {
 			my @query_names = sort keys %{$ar->[2]};
 			# output to file
+			# hit_name \t hit_len \t hit_block_start \t hit_block_end \t hit_block_length \t query names
 			print $out2 join("\t", $tk, $hit_len{$tk}, $ar->[0], $ar->[1], $ar->[1]-$ar->[0]+1, join(",", @query_names))."\n";
-
-			# hit name, hit len, hit一个block的起点，hit一个block的终点，hit一个block的长度
-			$total_cov += ($ar->[1]-$ar->[0]+1); #一个hit上所有非重叠block的长度之和
-			@aa{@query_names} = (1) x scalar(@query_names); #将所有contigs的名称存入hash表
+			
+			$total_cov += ($ar->[1]-$ar->[0]+1); 		# 一个hit上所有非重叠block的长度之和
+			@aa{@query_names} = (1) x scalar(@query_names); # 将所有contigs的名称存入hash表
 		}
-		# output
+
+		# output file: known.cov
+		# format:
+		# hit_id \t hit_length \t hit_converage_len \t hit_coverage_% \t contigs_name \t contigs_num
 		print $out1 join("\t", $tk, $hit_len{$tk}, $total_cov, $total_cov/$hit_len{$tk}*1.0, join(",", sort keys %aa), scalar(keys %aa))."\n"; 
-		#hit名称，hit长度，hit被覆盖bp数，hit被覆盖的百分比，所有contigs名称，contigs数量
+		
 	}
 	$out1->close;
 	$out2->close;
@@ -700,7 +723,7 @@ sub arrange_col2
 	while(<$in>) {
 		chomp;
 		my @a = split(/\t/, $_);
-		my $coverage= 1.0*$a[7]/$a[1];					# get coverage
+		my $coverage= 1.0 * $a[7] / $a[1];				# get coverage
 		push(@all_data, [@a[0,1,7],$coverage,@a[4,5,6,8,9]]);		# re-order the data, then put them to array
 	}
 	$in->close;

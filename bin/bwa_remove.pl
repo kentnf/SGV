@@ -45,7 +45,7 @@ our $thread_num = 8;
 ################################
 our $WORKING_DIR	= cwd();				# current folder
 our $DATABASE_DIR 	= ${FindBin::RealBin}."/../databases";	# database folder
-our $BIN_DIR 		= ${FindBin::RealBin};			# programs folder
+our $BIN_DIR 		= ${FindBin::RealBin};			# script folder
 our $tf			= $WORKING_DIR."/temp";			# temp folder;
 ##################
 # get input para #

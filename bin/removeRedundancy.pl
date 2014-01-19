@@ -48,8 +48,8 @@ our $gap_extension = 1;		# megablast中，对gap open的罚分，必须是正整数
 ################################
 ##   设置所有目录和文件的路径 ##
 ################################
-our $WORKING_DIR=cwd();		#工作目录就是当前目录
-our $BIN_DIR=${FindBin::RealBin};#所有可执行文件所在的目录
+our $WORKING_DIR=cwd();			#工作目录就是当前目录
+our $BIN_DIR=${FindBin::RealBin};	#所有可执行文件所在的目录
 
 ##################
 ## 程序参数处理 ##

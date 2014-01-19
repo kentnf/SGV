@@ -54,11 +54,11 @@ our $gap_extension = 1;	# megablast: penalty for gap extension
 ################################
 # set path for file and folders#
 ################################
-our $WORKING_DIR	= cwd();			# current folder
-our $DATABASE_DIR	= $WORKING_DIR."/databases";	# database folder
-our $BIN_DIR		= ${FindBin::RealBin};		# program folder
-our $TEMP_DIR 		= $WORKING_DIR."/temp";		# temp folder
-my $tf = $TEMP_DIR;					# short name of temp folder
+our $WORKING_DIR	= cwd();				# current folder
+our $DATABASE_DIR	= ${FindBin::RealBin}."/../databases";	# database folder
+our $BIN_DIR		= ${FindBin::RealBin};			# program folder
+our $TEMP_DIR 		= $WORKING_DIR."/temp";			# temp folder
+my $tf = $TEMP_DIR;						# short name of temp folder
 
 #################
 # parameters	#

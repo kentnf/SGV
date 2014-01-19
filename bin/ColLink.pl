@@ -1,10 +1,10 @@
 #!/usr/bin/perl
 
-#最终输出的文件中id与inputfile2中保持一致
-#文件inputfile1中id与inputfile2中id一样的，对应的信息保留
-#每个文件内部的各列不是必须选择的，而且顺序可以变换
+# 最终输出的文件中id与inputfile2中保持一致
+# 文件inputfile1中id与inputfile2中id一样的，对应的信息保留
+# 每个文件内部的各列不是必须选择的，而且顺序可以变换
+
 use strict;
-use warnings;
 use Getopt::Long;
 use IO::File;
 
@@ -34,7 +34,9 @@ $opts{help} and die "$info";
 !@ARGV and -t and die "$info"; 
 
 my @Col1 = split(/,/,$opts{col1});
-my @Col2 = split(/,/,$opts{col2});
+my @Col2;
+if ( $opts{col2} ) { @Col2 = split(/,/,$opts{col2}); } else { $opts{add} = 1; }
+
 my @KC1 = (0); 
 my @KC2 = (0); 
 defined $opts{keyC1} and @KC1 = split(/,/, $opts{keyC1});
@@ -80,16 +82,24 @@ while (<F1>) {
 		}# end of F1_COL;
 		$need{$tk} = join("\t", @temp[@tt]);
 	}else{
-		$need{$tk} = join("\t",@temp[@Col1]);
+		$need{$tk} = join("\t", @temp[@Col1]);
 	}
 }
 close F1;
-#open(OUT,'>',$out) or die $info;
+
+#################################################################
+# parse input file 2						#
+# output combined files						#
+#################################################################
+
 while (<>) {
 	chomp;
 	my @temp = split(/\t/,$_);
 	my ($line,$add);
+
+	# generate key for table
 	my $tk = join("\t", @temp[@KC2]); 
+
 	if (defined $need{$tk}) {
 		$add = $need{$tk};
 	}else{
@@ -97,15 +107,17 @@ while (<>) {
 		$#tt = $#Col1;
 		$add = join("\t",@tt);
 	}
+
 	if ($opts{add}) {
 		$line = $_;
 	}else{
 		$line = join("\t",@temp[@Col2]);
 	}
+
 	if (defined $opts{sign}) {
 		$add = (defined $need{$tk})?$yS:$nS;
 	}
+
 	print STDOUT "$line\t$add\n";
 }
-#close OUT;
 
